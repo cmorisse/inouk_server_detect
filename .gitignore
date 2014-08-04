@@ -1,0 +1,31 @@
+*.pyc
+.DS_Store
+.hg
+.idea/
+*.orig
+*.mo
+*.pot
+.bzr
+.bzrignore
+.project
+.pydevproject
+.settings
+
+; For buildout
+bin
+eggs
+parts
+.installed.cfg
+develop-eggs
+downloads
+etc
+buildout.cfg
+README.txt
+bootstrap.py
+
+; For virtualenv
+bin
+lib
+.Python
+include
+py27
