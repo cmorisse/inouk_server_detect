@@ -22,18 +22,18 @@
     'version': '0.1',   # Eg. 0.1 : Warning used for migration scripts
     'author': 'Cyril MORISSE - @cmorisse',
     'category': 'Inouk',
-    'description': """detects which kind of server is running base on ip address and update a set of
-     variables accordingly:
-     - openerp.ik_sd_is_production_server = True | False
-     - openerp.ik_sd_is_staging_server = True | False
-     - openerp.ik_sd_is_test_server = True | False
-     - openerp.ik_sd_detected_ip = current_ip
-     - openerp.ik_sd_server_kind = 'staging' | 'production' | 'test'.
+    'description': """
+Detects which kind of server is running base on ip address and update a set of
+variables accordingly:
+    - openerp.ik_sd_is_production_server = True | False
+    - openerp.ik_sd_is_staging_server = True | False
+    - openerp.ik_sd_is_test_server = True | False
+    - openerp.ik_sd_detected_ip = current_ip
+    - openerp.ik_sd_server_kind = 'staging' | 'production' | 'test'.
 
-     Configuration
-     -------------
-
-     Add these lines to your buildout.cfg:
+Configuration
+-------------
+    Add these lines to your buildout.cfg:
 
     #
     # Inouk Server Detect Configution
