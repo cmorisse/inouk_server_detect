@@ -31,6 +31,11 @@ variables accordingly:
     - openerp.ik_sd_detected_ip = current_ip
     - openerp.ik_sd_server_kind = 'staging' | 'production' | 'test'.
 
+If the ik_sd_colorise option is True then the menu will be colorised:
+ staging : yellow
+ production : white
+ test : orange
+
 Configuration
 -------------
     Add these lines to your buildout.cfg:
@@ -40,6 +45,7 @@ Configuration
     #
     options.ik_sd_production_servers_ips = server.domain.ext
     options.ik_sd_staging_servers_ips = 1.3.4.5,56.34.56.67
+    options.ik_sd_colorise = True
 
 """,
     'website': '',
@@ -50,7 +56,9 @@ Configuration
     ],
     'js': [],
     'qweb': [],
-    'css': [],
+    'css': [
+        "static/src/css/server_type_style.css",
+    ],
     'demo': [],
     'test': [],
     'post_load': 'server_detect',
