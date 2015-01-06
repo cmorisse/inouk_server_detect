@@ -27,6 +27,10 @@ def server_detect():
 
     current_ip = socket.gethostbyname(socket.gethostname())
 
+    #in some case, this will return 127.* so we have to use another method
+    if current_ip.startswith("127."):
+        current_ip = [(s.connect(('8.8.8.8', 80)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]
+
     if openerp.tools.config.options.get('ik_sd_staging_servers_ips', None):
         staging_servers_ips = openerp.tools.config.options['ik_sd_staging_servers_ips'].split(',')
     else:
