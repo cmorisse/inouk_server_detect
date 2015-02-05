@@ -12,15 +12,20 @@ _logger = logging.getLogger('Inouk Server Detector')
 def colorize_menu():
     # if we want to show visual difference between differents servers Or if we are in production server we have to force
     # the original color
-    if openerp.tools.config.options.get('ik_sd_colorise', None) or (openerp.ik_sd_server_kind == 'production'):
-        base_path = os.path.dirname(os.path.realpath(__file__))
 
-        css_to_copy_file = '%s/static/src/css/server_type_style_%s.css' % (base_path, openerp.ik_sd_server_kind)
-        original_css = '%s/static/src/css/server_type_style.css' % base_path
+    server_type = 'production'
 
-        _logger.info(' Use CSS: %s ' % css_to_copy_file)
+    if openerp.tools.config.options.get('ik_sd_colorise', None):
+        server_type = openerp.ik_sd_server_kind
 
-        shutil.copyfile(css_to_copy_file, original_css)
+    base_path = os.path.dirname(os.path.realpath(__file__))
+
+    css_to_copy_file = '%s/static/src/css/server_type_style_%s.css' % (base_path, server_type)
+    original_css = '%s/static/src/css/server_type_style.css' % base_path
+
+    _logger.info(' Use CSS: %s ' % css_to_copy_file)
+
+    shutil.copyfile(css_to_copy_file, original_css)
 
 
 def server_detect():
