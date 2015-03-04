@@ -49,7 +49,7 @@ def server_detect():
     if current_ip in staging_servers_ips:
         openerp.ik_sd_is_production_server = False
         openerp.ik_sd_is_staging_server = True
-        openerp.ik_sd_is_test_server = True
+        openerp.ik_sd_is_test_server = False
         openerp.ik_sd_detected_ip = current_ip
         openerp.ik_sd_server_kind = 'staging'
         _logger.info("Server is 'staging', detected IP address=%s" % current_ip)
