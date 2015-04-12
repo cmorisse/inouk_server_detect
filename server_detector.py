@@ -46,6 +46,11 @@ def server_detect():
     else:
         production_servers_ips = []
 
+    if openerp.tools.config.options.get('ik_sd_email_debug_recipients', None):
+        openerp.ik_sd_email_debug_recipients = openerp.tools.config.options['ik_sd_email_debug_recipients']
+    else:
+        openerp.ik_sd_email_debug_recipients = []
+
     if current_ip in staging_servers_ips:
         openerp.ik_sd_is_production_server = False
         openerp.ik_sd_is_staging_server = True
