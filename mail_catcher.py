@@ -36,7 +36,7 @@ class IrMailServer(osv.osv):
             recipient = message['to']
             subject = message['subject']
             message.replace_header('to', openerp.ik_sd_email_debug_recipients)
-            message.replace_header('subject', "To:%s||%s" % (recipient, subject,))
+            message.replace_header('subject', "IKMC_To:%s||%s" % (recipient, subject,))
             _logger.debug("Message '%s' for '%s' forwarded to '%s'", subject, recipient, openerp.ik_sd_email_debug_recipients)
 
         return super(IrMailServer, self).send_email(cr, uid, message, mail_server_id=mail_server_id, smtp_server=smtp_server,
