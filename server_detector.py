@@ -30,7 +30,10 @@ def colorize_menu():
 
 def server_detect():
 
-    current_ip = socket.gethostbyname(socket.gethostname())
+    try:
+        current_ip = socket.gethostbyname(socket.gethostname())
+    except:
+        current_ip = ''
 
     #in some case, this will return 127.* so we have to use another method
     if current_ip.startswith("127."):
