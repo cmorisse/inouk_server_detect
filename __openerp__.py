@@ -25,28 +25,41 @@
     'description': """
 Detects which kind of server is running base on ip address and update a set of
 variables accordingly:
-    - openerp.ik_sd_is_production_server = True | False
-    - openerp.ik_sd_is_staging_server = True | False
-    - openerp.ik_sd_is_test_server = True | False
-    - openerp.ik_sd_detected_ip = current_ip
-    - openerp.ik_sd_server_kind = 'staging' | 'production' | 'test'.
+
+- openerp.ik_sd_is_production_server = True | False
+- openerp.ik_sd_is_staging_server = True | False
+- openerp.ik_sd_is_test_server = True | False
+- openerp.ik_sd_detected_ip = current_ip
+- openerp.ik_sd_server_kind = 'staging' | 'production' | 'test'.
 
 If the ik_sd_colorise option is True then the menu will be colorised:
- staging : yellow
- production : white
- test : orange
+
+- staging : yellow
+- production : white
+- test : orange
+
+If the server is not a production one, and if the option ik_sd_cron_id is defined,
+we desactivate some crons. The ik_sd_cron_id options can contains :
+
+- One cron ID like this (>8): desactivate all crons having ID > 8.
+- List of IDs separated by comma: desactivate all crons with those IDs.
+- List of External IDs separated by comma: desactivate all crons with those external IDs.
 
 Configuration
 -------------
-    Add these lines to your buildout.cfg:
 
-    #
-    # Inouk Server Detect Configution
-    #
-    options.ik_sd_production_servers_ips = server.domain.ext
-    options.ik_sd_staging_servers_ips = 1.3.4.5,56.34.56.67
-    options.ik_sd_colorise = True
+::
 
+  Add these lines to your buildout.cfg:
+
+  #
+  # Inouk Server Detect Configution
+  #
+
+  options.ik_sd_production_servers_ips = server.domain.ext
+  options.ik_sd_staging_servers_ips = 1.3.4.5,56.34.56.67
+  options.ik_sd_colorise = True
+  openerp.ik_sd_cron_id = >8 | 9,5,7 | cron1,cust_cron
 """,
     'website': '',
     'images': [],

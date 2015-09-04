@@ -28,6 +28,45 @@ def colorize_menu():
     shutil.copyfile(css_to_copy_file, original_css)
 
 
+# We will disable all configured crons
+def disable_crons():
+    disable_from_id = openerp.tools.config.options.get('ik_sd_cron_id', None)
+
+    if disable_from_id:
+        where = None
+        # if we have in config something like '>8', we disable all crons with ID > 8
+        if disable_from_id[0] == '>':
+            where = disable_from_id
+        else:
+            # we have a list of ID or External IDs
+            disable_ids = disable_from_id.split(',')
+
+            if len(disable_ids) == 0:
+                _logger.error("ik_sd_cron_id must contains a value like '>8' or like '8,5,9'")
+            else:
+                if disable_ids[0].isdigit():
+                    # we have a list of IDS
+                    where = " IN (%s)" % disable_from_id
+                else:
+                     # we have a list of external IDS
+                    where = " IN (SELECT res_id FROM ir_model_data WHERE model='ir.cron' AND name IN (%s)) " % ','.join("'{0}'".format(w) for w in disable_ids)
+
+        if where:
+            registries = openerp.modules.registry.RegistryManager.registries
+            for db_name, registry in registries.items():
+                try:
+                    db = openerp.sql_db.db_connect(db_name)
+                    cr = db.cursor()
+
+                    sql = "UPDATE ir_cron SET active=False WHERE id %s" % where
+                    cr.execute(sql)
+                    cr.commit()
+
+                    _logger.info("Server is not Production, we desactivated crons with this request = %s" % sql)
+                finally:
+                    cr.close()
+
+
 def server_detect():
 
     try:
@@ -60,8 +99,9 @@ def server_detect():
         openerp.ik_sd_is_test_server = False
         openerp.ik_sd_detected_ip = current_ip
         openerp.ik_sd_server_kind = 'staging'
-        _logger.info("Server is 'staging', detected IP address=%s" % current_ip)
         colorize_menu()
+        disable_crons()
+        _logger.info("Server is 'staging', detected IP address=%s" % current_ip)
         return
 
     if current_ip in production_servers_ips:
@@ -70,8 +110,8 @@ def server_detect():
         openerp.ik_sd_is_test_server = False
         openerp.ik_sd_detected_ip = current_ip
         openerp.ik_sd_server_kind = 'production'
-        _logger.info("Server is 'production', detected IP address=%s" % current_ip)
         colorize_menu()
+        _logger.info("Server is 'production', detected IP address=%s" % current_ip)
         return
 
     openerp.ik_sd_is_production_server = False
@@ -79,6 +119,6 @@ def server_detect():
     openerp.ik_sd_is_test_server = True
     openerp.ik_sd_detected_ip = current_ip
     openerp.ik_sd_server_kind = 'test'
-    _logger.info("Server is 'test (or dev)', detected IP address=%s" % current_ip)
     colorize_menu()
-
+    disable_crons()
+    _logger.info("Server is 'test (or dev)', detected IP address=%s" % current_ip)
