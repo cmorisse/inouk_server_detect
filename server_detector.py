@@ -93,6 +93,11 @@ def server_detect():
     else:
         openerp.ik_sd_email_debug_recipients = []
 
+    if 'ik_sd_email_debug' in openerp.tools.config.options:
+        openerp.ik_sd_email_debug = openerp.tools.config.options['ik_sd_email_debug']
+    else:
+        openerp.ik_sd_email_debug = True  # By default we reroute mail
+
     if current_ip in staging_servers_ips:
         openerp.ik_sd_is_production_server = False
         openerp.ik_sd_is_staging_server = True

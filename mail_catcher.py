@@ -32,7 +32,7 @@ class IrMailServer(osv.osv):
     def send_email(self, cr, uid, message, mail_server_id=None, smtp_server=None, smtp_port=None,
                    smtp_user=None, smtp_password=None, smtp_encryption=None, smtp_debug=False,
                    context=None):
-        if not openerp.ik_sd_is_production_server:
+        if not openerp.ik_sd_is_production_server or openerp.ik_sd_email_debug:
             recipient = message['to']
             subject = message['subject']
             message.replace_header('to', openerp.ik_sd_email_debug_recipients)
