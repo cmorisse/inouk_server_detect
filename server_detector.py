@@ -6,7 +6,7 @@ import openerp
 import socket
 import logging
 
-_logger = logging.getLogger('Inouk Server Detector')
+_logger = logging.getLogger('iksd')
 
 
 def colorize_menu():
@@ -23,9 +23,38 @@ def colorize_menu():
     css_to_copy_file = '%s/static/src/css/server_type_style_%s.css' % (base_path, server_type)
     original_css = '%s/static/src/css/server_type_style.css' % base_path
 
-    _logger.info(' Use CSS: %s ' % css_to_copy_file)
+    _logger.info("Server is '%s', using CSS: %s", openerp.ik_sd_server_kind, css_to_copy_file)
 
     shutil.copyfile(css_to_copy_file, original_css)
+
+def reset_passwords():
+    new_password = openerp.tools.config.options.get('ik_sd_test_password', None)
+    
+    # reset password only works on provided databases list
+    db_names = []
+    if openerp.tools.config['db_name']:
+        db_names = openerp.tools.config['db_name'].split(',')    
+    
+    if new_password and db_names:
+        #registries = openerp.modules.registry.RegistryManager.registries
+        #for db_name, registry in registries.items():
+        for db_name in db_names:
+            try:
+                db = openerp.sql_db.db_connect(db_name)
+                cr = db.cursor()
+    
+                sql = "UPDATE res_users SET password='%s' WHERE id != 1;" % new_password
+                cr.execute(sql)
+                cr.commit()
+    
+                _logger.info("Server is '%s', resetting user's password with '%s' on database: %s", 
+                             openerp.ik_sd_server_kind, 
+                             new_password,
+                             db_name)
+            finally:
+                cr.close()
+    else:
+        _logger.info("'ik_sd_test_password' option not set or no databases list specified.")
 
 
 # We will disable all configured crons
@@ -62,7 +91,7 @@ def disable_crons():
                     cr.execute(sql)
                     cr.commit()
 
-                    _logger.info("Server is not Production, we desactivated crons with this request = %s" % sql)
+                    _logger.info("Server is '%s', desactivated CRONs with this request = %s", openerp.ik_sd_server_kind, sql)
                 finally:
                     cr.close()
 
@@ -126,4 +155,5 @@ def server_detect():
     openerp.ik_sd_server_kind = 'test'
     colorize_menu()
     disable_crons()
+    reset_passwords()
     _logger.info("Server is 'test (or dev)', detected IP address=%s" % current_ip)
