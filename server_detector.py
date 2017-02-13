@@ -1,5 +1,6 @@
 import shutil
 import os
+import sys
 
 __author__ = 'cmorisse'
 import openerp
@@ -30,29 +31,36 @@ def colorize_menu():
 def reset_passwords():
     new_password = openerp.tools.config.options.get('ik_sd_test_password', None)
     
+    if openerp.ik_sd_is_production_server:
+        # On Production servers reset_passwords() is ignored
+        return 
+    
     # reset password only works on provided databases list
     db_names = []
     if openerp.tools.config['db_name']:
         db_names = openerp.tools.config['db_name'].split(',')    
     
-    if new_password and db_names:
-        #registries = openerp.modules.registry.RegistryManager.registries
-        #for db_name, registry in registries.items():
-        for db_name in db_names:
-            try:
-                db = openerp.sql_db.db_connect(db_name)
-                cr = db.cursor()
-    
-                sql = "UPDATE res_users SET password='%s' WHERE id != 1;" % new_password
-                cr.execute(sql)
-                cr.commit()
-    
-                _logger.info("Server is '%s', resetting user's password with '%s' on database: %s", 
-                             openerp.ik_sd_server_kind, 
-                             new_password,
-                             db_name)
-            finally:
-                cr.close()
+    if new_password:
+        if db_names:
+            for db_name in db_names:
+                try:
+                    db = openerp.sql_db.db_connect(db_name)
+                    cr = db.cursor()
+        
+                    sql = "UPDATE res_users SET password='%s' WHERE id != 1;" % new_password
+                    cr.execute(sql)
+                    cr.commit()
+        
+                    _logger.info("Server is '%s', resetting user's password with '%s' on database: %s", 
+                                 openerp.ik_sd_server_kind, 
+                                 new_password,
+                                 db_name)
+                finally:
+                    cr.close()
+        else:
+            _logger.critical("Odoo launched with 'ik_sd_test_password' option but no databases specified. Aborting.")
+            os._exit(1)
+            
     else:
         _logger.info("'ik_sd_test_password' option not set or no databases list specified.")
 
