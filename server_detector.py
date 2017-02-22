@@ -32,7 +32,8 @@ def reset_passwords():
     new_password = openerp.tools.config.options.get('ik_sd_test_password', None)
     
     if openerp.ik_sd_is_production_server:
-        # On Production servers reset_passwords() is ignored
+        _logger.info("Server is '%s', ignoring password management.", 
+                     openerp.ik_sd_server_kind)
         return 
     
     # reset password only works on provided databases list
@@ -143,6 +144,7 @@ def server_detect():
         openerp.ik_sd_server_kind = 'staging'
         colorize_menu()
         disable_crons()
+        reset_passwords()
         _logger.info("Server is 'staging', detected IP address=%s" % current_ip)
         return
 
