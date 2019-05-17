@@ -6,6 +6,7 @@ import logging
 import json
 import urllib2
 import threading
+import cgi
 
 __author__ = 'cmorisse'
 import openerp
@@ -54,9 +55,12 @@ def get_public_ip():
 
 
 def update_ribbon():
+    """ If module `web_environment_ribbon`is installed and `ik_sd_update_ribbon` is True
+    update Ribbon color, background and text accoding to serveur kind and option
+    `ik_sd_ribbon_name` parameters.
     """
-    """
-    colors = {
+    # TODO: Allow users to customize colors and text
+    ribbon_colors = {
         #'server_kind': ('ribbon.color', 'ribbon.background.color')
         'production': ('Production', '#F0F0F0', 'rgba(255,0,0,.6)'),
         'staging': ('Staging', '#FFFFFF', 'rgba(253,98,10,.8)'),
@@ -64,8 +68,8 @@ def update_ribbon():
     }
     
     if openerp.tools.config.options.get('ik_sd_update_ribbon', None):
-        ribbon_data = colors[openerp.ik_sd_server_kind]
-        ribbon_name = openerp.tools.config.options.get('ik_sd_ribbon_name', ribbon_data[0])
+        ribbon_data = ribbon_colors[openerp.ik_sd_server_kind]
+        ribbon_name = cgi.escape(openerp.tools.config.options.get('ik_sd_ribbon_name', ribbon_data[0]))
         ribbon_color = ribbon_data[1]
         ribbon_background_color = ribbon_data[2]
 
@@ -73,13 +77,17 @@ def update_ribbon():
         for db_name in db_names:
             cr = get_cursor(db_name)
             try:
-                cr.execute("UPDATE ir_config_parameter SET value = '%s' WHERE key='ribbon.name'" % ribbon_name);
+                if openerp.ik_sd_server_kind == 'production':
+                    cr.execute("UPDATE ir_config_parameter SET key = 'ribbon.name.disabled' WHERE key='ribbon.name'");
+                else:
+                    cr.execute("UPDATE ir_config_parameter SET key = 'ribbon.name' WHERE key='ribbon.name.disabled'");
+                    cr.execute("UPDATE ir_config_parameter SET value = '%s' WHERE key='ribbon.name'" % ribbon_name);
                 cr.execute("UPDATE ir_config_parameter SET value = '%s' WHERE key='ribbon.color'" % ribbon_color);
                 cr.execute("UPDATE ir_config_parameter SET value = '%s' WHERE key='ribbon.background.color'" % ribbon_background_color);
                 cr.commit()
             finally:
                 cr.close()
-            _logger.info("Ribbon updated in database: \'%s\'" % db_name)
+            _logger.info("Ribbon updated in database: \'%s\' with name: '%s'" % (db_name, ribbon_name,))
 
 
 def reset_passwords():
@@ -88,15 +96,11 @@ def reset_passwords():
     new_password = openerp.tools.config.options.get(option_name, None)
     
     if openerp.ik_sd_is_production_server:
-        _logger.info("Server is '%s', ignoring password management.", 
-                     openerp.ik_sd_server_kind)
+        _logger.info("Ignoring password management on production servers.")
         return 
     
     # reset password only works on provided databases list
-    db_names = []
-    if openerp.tools.config['db_name']:
-        db_names = openerp.tools.config['db_name'].split(',')    
-    
+    db_names = get_databases()
     if new_password:
         if db_names:
             for db_name in db_names:
@@ -108,8 +112,7 @@ def reset_passwords():
                     cr.execute(sql)
                     cr.commit()
         
-                    _logger.info("Server is '%s', resetting user's password with '%s' on database: %s", 
-                                 openerp.ik_sd_server_kind, 
+                    _logger.info("Resetting all users password with '%s' on database: %s", 
                                  new_password,
                                  db_name)
                 finally:
@@ -148,28 +151,27 @@ def disable_crons():
                     where = " IN (SELECT res_id FROM ir_model_data WHERE model='ir.cron' AND name IN (%s)) " % ','.join("'{0}'".format(w) for w in disable_ids)
 
         if where:
-            registries = openerp.modules.registry.RegistryManager.registries
-            for db_name, registry in registries.iteritems():
-                try:
-                    cr = get_cursor(db_name)
-
-                    sql = "UPDATE ir_cron SET active=False WHERE id %s" % where
-                    cr.execute(sql)
-                    cr.commit()
-
-                    _logger.info("Server is '%s', desactivated CRONs with this request = %s", openerp.ik_sd_server_kind, sql)
-                finally:
-                    cr.close()
-
+            db_names = get_databases() 
+            if db_names:
+                for db_name in db_names:
+                    try:
+                        cr = get_cursor(db_name)
+    
+                        sql = "UPDATE ir_cron SET active=false WHERE id %s" % where
+                        cr.execute(sql)
+                        cr.commit()
+    
+                        _logger.info("Deactivated CRONs using this query: %s", sql)
+                    finally:
+                        cr.close()
+            else:
+                pass
 
 
 def server_detect():
 
     current_ip = get_public_ip()
     
-    print("registries: %s" % list(openerp.modules.registry.RegistryManager.registries.iteritems()))
-    print("--database=%s" % openerp.tools.config['db_name'])
-
     if openerp.tools.config.options.get('ik_sd_staging_servers_ips', None):
         staging_servers_ips = openerp.tools.config.options['ik_sd_staging_servers_ips'].split(',')
     else:

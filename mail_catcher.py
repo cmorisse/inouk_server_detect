@@ -21,9 +21,9 @@ import openerp
 
 from openerp.osv import osv, fields
 
-_logger = logging.getLogger("InoukMailCatcher")
+_logger = logging.getLogger("ikmc")  # Inouk Mail Catcher
 
-_logger.info("started")
+_logger.info("Started")
 
 class IrMailServer(osv.osv):
     _name = "ir.mail_server"
