@@ -1,35 +1,91 @@
 import shutil
 import os
 import sys
+import socket
+import logging
+import json
+import urllib2
+import threading
 
 __author__ = 'cmorisse'
 import openerp
-import socket
-import logging
 
 _logger = logging.getLogger('iksd')
 
+def get_databases():
+    db_names = []
+    if openerp.tools.config['db_name']:
+        db_names = openerp.tools.config['db_name'].split(',')
+    return db_names
+    
 
-def colorize_menu():
-    # if we want to show visual difference between differents servers Or if we are in production server we have to force
-    # the original color
+def get_cursor(db_name):
+    """ returns a Cursor for `db_name`.
 
-    server_type = 'production'
+    Once created cursor can be used with:
+       - cr.execute(query)
+       - cr.commit()
+       - cr.rollback()
 
-    if openerp.tools.config.options.get('ik_sd_colorise', None):
-        server_type = openerp.ik_sd_server_kind
+    Finally Cursor must be explicitly closed with:
+       - cr.close()
+    """
+    registries = openerp.modules.registry.RegistryManager.registries.iteritems()
+    db_names = [r[0] for r in registries]
+    if db_name in db_names:
+        db_connection = openerp.sql_db.db_connect(db_name)
+        return db_connection.cursor()
+    return None
 
-    base_path = os.path.dirname(os.path.realpath(__file__))
 
-    css_to_copy_file = '%s/static/src/css/server_type_style_%s.css' % (base_path, server_type)
-    original_css = '%s/static/src/css/server_type_style.css' % base_path
+def get_public_ip():
+    """ Retrieve server public IP using 2 sources from
+    https://stackoverflow.com/questions/9481419/how-can-i-get-the-public-ip-using-python2-7
+    """
+    try:
+        ip = urllib2.urlopen('https://api.ipify.org').read()
+    except:
+        try:
+            ip = json.load(urllib2.urlopen('http://httpbin.org/ip'))['origin']
+        except:
+            _logger.critical("Unable to retrieve public IP for server.")
+            return None
+    return ip
 
-    _logger.info("Server is '%s', using CSS: %s", openerp.ik_sd_server_kind, css_to_copy_file)
 
-    shutil.copyfile(css_to_copy_file, original_css)
+def update_ribbon():
+    """
+    """
+    colors = {
+        #'server_kind': ('ribbon.color', 'ribbon.background.color')
+        'production': ('Production', '#F0F0F0', 'rgba(255,0,0,.6)'),
+        'staging': ('Staging', '#FFFFFF', 'rgba(253,98,10,.8)'),
+        'development': ('Development', '#FDFDFD', 'rgba(253,98,10,.8)'),
+    }
+    
+    if openerp.tools.config.options.get('ik_sd_update_ribbon', None):
+        ribbon_data = colors[openerp.ik_sd_server_kind]
+        ribbon_name = openerp.tools.config.options.get('ik_sd_ribbon_name', ribbon_data[0])
+        ribbon_color = ribbon_data[1]
+        ribbon_background_color = ribbon_data[2]
+
+        db_names = get_databases()
+        for db_name in db_names:
+            cr = get_cursor(db_name)
+            try:
+                cr.execute("UPDATE ir_config_parameter SET value = '%s' WHERE key='ribbon.name'" % ribbon_name);
+                cr.execute("UPDATE ir_config_parameter SET value = '%s' WHERE key='ribbon.color'" % ribbon_color);
+                cr.execute("UPDATE ir_config_parameter SET value = '%s' WHERE key='ribbon.background.color'" % ribbon_background_color);
+                cr.commit()
+            finally:
+                cr.close()
+            _logger.info("Ribbon updated in database: \'%s\'" % db_name)
+
 
 def reset_passwords():
-    new_password = openerp.tools.config.options.get('ik_sd_test_password', None)
+    server_type = openerp.ik_sd_server_kind
+    option_name = "ik_sd_%s_passwords" % server_type
+    new_password = openerp.tools.config.options.get(option_name, None)
     
     if openerp.ik_sd_is_production_server:
         _logger.info("Server is '%s', ignoring password management.", 
@@ -45,10 +101,10 @@ def reset_passwords():
         if db_names:
             for db_name in db_names:
                 try:
-                    db = openerp.sql_db.db_connect(db_name)
-                    cr = db.cursor()
+                    cr = get_cursor(db_name)
         
-                    sql = "UPDATE res_users SET password='%s' WHERE id != 1;" % new_password
+                    #sql = "UPDATE res_users SET password='%s' WHERE id != 1;" % new_password
+                    sql = "UPDATE res_users SET password='%s';" % new_password
                     cr.execute(sql)
                     cr.commit()
         
@@ -59,42 +115,43 @@ def reset_passwords():
                 finally:
                     cr.close()
         else:
-            _logger.critical("Odoo launched with 'ik_sd_test_password' option but no databases specified. Aborting.")
+            _logger.critical("Odoo launched with '%s' option but no databases specified. Aborting." % option_name)
             os._exit(1)
             
     else:
         _logger.info("'ik_sd_test_password' option not set or no databases list specified.")
 
 
-# We will disable all configured crons
-def disable_crons():
-    disable_from_id = openerp.tools.config.options.get('ik_sd_cron_id', None)
 
-    if disable_from_id:
+def disable_crons():
+    """ Disable CRONs sepcified by option `ik_sd_disable_cron`.
+    """
+    to_disable_ids = openerp.tools.config.options.get('ik_sd_disable_cron', None)
+
+    if to_disable_ids:
         where = None
         # if we have in config something like '>8', we disable all crons with ID > 8
-        if disable_from_id[0] == '>':
-            where = disable_from_id
+        if to_disable_ids[0] == '>':
+            where = to_disable_ids
         else:
             # we have a list of ID or External IDs
-            disable_ids = disable_from_id.split(',')
+            disable_ids = to_disable_ids.split(',')
 
             if len(disable_ids) == 0:
-                _logger.error("ik_sd_cron_id must contains a value like '>8' or like '8,5,9'")
+                _logger.error("ik_sd_disable_cron must contains a value like '>8' or like '8,5,9'")
             else:
                 if disable_ids[0].isdigit():
                     # we have a list of IDS
-                    where = " IN (%s)" % disable_from_id
+                    where = " IN (%s)" % disable_ids
                 else:
                      # we have a list of external IDS
                     where = " IN (SELECT res_id FROM ir_model_data WHERE model='ir.cron' AND name IN (%s)) " % ','.join("'{0}'".format(w) for w in disable_ids)
 
         if where:
             registries = openerp.modules.registry.RegistryManager.registries
-            for db_name, registry in registries.items():
+            for db_name, registry in registries.iteritems():
                 try:
-                    db = openerp.sql_db.db_connect(db_name)
-                    cr = db.cursor()
+                    cr = get_cursor(db_name)
 
                     sql = "UPDATE ir_cron SET active=False WHERE id %s" % where
                     cr.execute(sql)
@@ -105,16 +162,13 @@ def disable_crons():
                     cr.close()
 
 
+
 def server_detect():
 
-    try:
-        current_ip = socket.gethostbyname(socket.gethostname())
-    except:
-        current_ip = ''
-
-    #in some case, this will return 127.* so we have to use another method
-    if current_ip.startswith("127."):
-        current_ip = [(s.connect(('8.8.8.8', 80)), s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]
+    current_ip = get_public_ip()
+    
+    print("registries: %s" % list(openerp.modules.registry.RegistryManager.registries.iteritems()))
+    print("--database=%s" % openerp.tools.config['db_name'])
 
     if openerp.tools.config.options.get('ik_sd_staging_servers_ips', None):
         staging_servers_ips = openerp.tools.config.options['ik_sd_staging_servers_ips'].split(',')
@@ -142,10 +196,10 @@ def server_detect():
         openerp.ik_sd_is_test_server = False
         openerp.ik_sd_detected_ip = current_ip
         openerp.ik_sd_server_kind = 'staging'
-        colorize_menu()
+        _logger.info("Server is 'Staging', detected IP address=%s" % current_ip)
+        update_ribbon()
         disable_crons()
         reset_passwords()
-        _logger.info("Server is 'staging', detected IP address=%s" % current_ip)
         return
 
     if current_ip in production_servers_ips:
@@ -154,16 +208,16 @@ def server_detect():
         openerp.ik_sd_is_test_server = False
         openerp.ik_sd_detected_ip = current_ip
         openerp.ik_sd_server_kind = 'production'
-        colorize_menu()
-        _logger.info("Server is 'production', detected IP address=%s" % current_ip)
+        _logger.info("Server is 'Production', detected IP address=%s" % current_ip)
+        update_ribbon()
         return
 
     openerp.ik_sd_is_production_server = False
     openerp.ik_sd_is_staging_server = False
     openerp.ik_sd_is_test_server = True
     openerp.ik_sd_detected_ip = current_ip
-    openerp.ik_sd_server_kind = 'test'
-    colorize_menu()
+    openerp.ik_sd_server_kind = 'development'
+    _logger.info("Server is 'Development', detected IP address=%s" % current_ip)
+    update_ribbon()
     disable_crons()
     reset_passwords()
-    _logger.info("Server is 'test (or dev)', detected IP address=%s" % current_ip)
